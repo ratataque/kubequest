@@ -1,0 +1,29 @@
+providers:
+  kubernetesIngress:
+    enabled: false
+  kubernetesCRD:
+    enabled: true
+  kubernetesGateway:
+    enabled: true
+
+service:
+  type: NodePort
+
+ports:
+  web:
+    port: 8000
+    expose:
+      enabled: true
+    nodePort: 30080
+  websecure:
+    port: 8443
+    expose:
+      enabled: true
+    nodePort: 30443
+
+api:
+  dashboard: true
+  insecure: false
+
+gateway:
+  listeners: {}

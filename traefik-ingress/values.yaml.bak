@@ -1,0 +1,43 @@
+# values.yaml
+
+# 1. Pure Gateway API Provider Configuration
+providers:
+  kubernetesIngress:
+    enabled: false  # Disable legacy Ingress parsing
+  kubernetesCRD:
+    enabled: false  # Disable Traefik-native CRDs (IngressRoute)
+  kubernetesGateway:
+    enabled: true   # Enable the core Kubernetes Gateway API engine
+
+# 2. Configure Traefik as a regular NodePort Service
+service:
+  type: NodePort
+
+# 3. Define the internal container ports and map them to fixed NodePorts
+ports:
+  web:
+    port: 8000
+    expose:
+      enabled: true
+    nodePort: 30080    # Nginx on your public host will forward traffic here
+  websecure:
+    port: 8443
+    expose:
+      enabled: true
+    nodePort: 30443    # Nginx on your public host will forward traffic here
+  traefik:
+    port: 9000
+    expose:
+      enabled: true
+    nodePort: 30090    # Nginx on your public host will forward traffic here
+
+# 4. Enable the internal dashboard API engine
+api:
+  dashboard: true
+  insecure: true      # Exposes the dashboard API on port 9000 inside the cluster
+
+# 5. Disable the Helm chart's built-in Gateway template automation.
+# This prevents port 8000/validation conflicts, as you are applying
+# your own custom infrastructure files (gateway.yaml).
+gateway:
+  listeners: {}

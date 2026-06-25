@@ -1,0 +1,33 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cluster-edge-gateway
+  namespace: traefik             # Deployed directly inside your dedicated traefik namespace
+spec:
+  # Links directly to the default GatewayClass automatically created by Traefik
+  gatewayClassName: traefik
+  
+  listeners:
+    # ─── HTTP LISTENER ────────────────────────────────────────────────
+    - name: http-listener
+      protocol: HTTP
+      port: 8000                 # Traefik's internal non-root container port for HTTP
+      allowedRoutes:
+        namespaces:
+          from: All              # Essential: Allows HTTPRoutes from default, prod, dev namespaces to bind here
+
+    # ─── HTTPS LISTENER ───────────────────────────────────────────────
+    - name: https-listener
+      protocol: HTTPS
+      port: 8443                 # Traefik's internal non-root container port for HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All              # Essential: Allows secure application routes from any namespace
+      
+      # Optional Placeholder: Uncomment and configure this when you ready your TLS Secrets
+      # tls:
+      #   mode: Terminate
+      #   certificateRefs:
+      #     - kind: Secret
+      #       name: your-domain-tls-secret
+      #       namespace: traefik
