@@ -37,10 +37,13 @@ if [[ "${ROLE}" != "control-plane" && "${ROLE}" != "worker" ]]; then
 fi
 
 log "Installing base packages"
-dnf install -y curl git ca-certificates iproute-tc conntrack-tools socat
+dnf install -y curl git ca-certificates iproute-tc conntrack-tools socat iscsi-initiator-utils
 if [[ "${ROLE}" == "control-plane" && "${INSTALL_NGINX}" == "true" ]]; then
   dnf install -y nginx
 fi
+
+log "Enabling iSCSI for Longhorn"
+systemctl enable --now iscsid
 
 log "Kernel + sysctl prerequisites"
 cat >/etc/modules-load.d/k8s.conf <<'EOF'
@@ -152,10 +155,24 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       -f "${INSTALL_DIR}/traefik-ingress/values.yaml"
     kubectl -n traefik rollout status deploy/traefik --timeout=180s
 
+    log "Installing Longhorn"
+    helm repo add longhorn https://charts.longhorn.io >/dev/null 2>&1 || true
+    helm repo update
+    kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f -
+    helm upgrade --install longhorn longhorn/longhorn \
+      --namespace longhorn-system \
+      --create-namespace \
+      -f "${INSTALL_DIR}/infrastructure/longhorn/values.yaml"
+    kubectl -n longhorn-system wait --for=condition=Ready pod --all --timeout=600s
+    kubectl get sc longhorn >/dev/null
+
     log "Applying infra and app manifests"
     kubectl apply -f "${INSTALL_DIR}/infrastructure/gateway.yaml"
     kubectl apply -f "${INSTALL_DIR}/apps/whoami/deployement.yaml"
     kubectl apply -f "${INSTALL_DIR}/apps/whoami/http-route.yaml"
+    kubectl apply -f "${INSTALL_DIR}/apps/registry/registry-auth.secret.yaml"
+    kubectl apply -f "${INSTALL_DIR}/apps/registry/deployment.yaml"
+    kubectl apply -f "${INSTALL_DIR}/apps/registry/http-route.yaml"
 
     if [[ -f "${INSTALL_DIR}/apps/traefik-dashboard/auth" ]]; then
       kubectl -n traefik create secret generic traefik-dashboard-auth \
