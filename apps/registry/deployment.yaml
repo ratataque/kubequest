@@ -22,8 +22,8 @@ spec:
         - name: registry
           image: registry:3
           env:
-            - name: REGISTRY_HTTP_HOST
-              value: https://registry.kwer.fr
+            - name: REGISTRY_HTTP_RELATIVEURLS
+              value: "true"
             - name: REGISTRY_AUTH
               value: htpasswd
             - name: REGISTRY_AUTH_HTPASSWD_REALM
