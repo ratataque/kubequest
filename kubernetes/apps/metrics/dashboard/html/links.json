@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Traefik Dashboard",
+    "url": "http://localhost:8080"
+  },
+  {
+    "name": "Longhorn UI",
+    "url": "http://localhost:8081"
+  }
+]
