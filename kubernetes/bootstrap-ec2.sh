@@ -6,6 +6,7 @@ ROLE="${ROLE:-control-plane}"                  # control-plane | worker
 REPO_URL="${REPO_URL:-https://github.com/ratataque/kubequest.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/kubequest}"
+K8S_REPO_DIR="${K8S_REPO_DIR:-${INSTALL_DIR}/kubernetes}"
 
 K8S_SERIES="${K8S_SERIES:-v1.36}"
 K8S_VERSION="${K8S_VERSION:-v1.36.1}"
@@ -152,7 +153,7 @@ if [[ "${ROLE}" == "control-plane" ]]; then
     helm upgrade --install traefik traefik/traefik \
       --namespace traefik \
       --create-namespace \
-      -f "${INSTALL_DIR}/traefik-ingress/values.yaml"
+      -f "${K8S_REPO_DIR}/traefik-ingress/values.yaml"
     kubectl -n traefik rollout status deploy/traefik --timeout=180s
 
     log "Installing Longhorn"
@@ -162,38 +163,47 @@ if [[ "${ROLE}" == "control-plane" ]]; then
     helm upgrade --install longhorn longhorn/longhorn \
       --namespace longhorn-system \
       --create-namespace \
-      -f "${INSTALL_DIR}/infrastructure/longhorn/values.yaml"
+      -f "${K8S_REPO_DIR}/infrastructure/longhorn/values.yaml"
     kubectl -n longhorn-system wait --for=condition=Ready pod --all --timeout=600s
     kubectl get sc longhorn >/dev/null
 
     log "Applying infra and app manifests"
-    kubectl apply -f "${INSTALL_DIR}/infrastructure/gateway.yaml"
-    kubectl apply -f "${INSTALL_DIR}/apps/whoami/deployement.yaml"
-    kubectl apply -f "${INSTALL_DIR}/apps/whoami/http-route.yaml"
-    kubectl apply -f "${INSTALL_DIR}/apps/registry/registry-auth.secret.yaml"
-    kubectl apply -f "${INSTALL_DIR}/apps/registry/deployment.yaml"
-    kubectl apply -f "${INSTALL_DIR}/apps/registry/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/gateway.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/whoami/deployement.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/whoami/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/registry/registry-auth.secret.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/registry/deployment.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/registry/http-route.yaml"
 
-    if [[ -f "${INSTALL_DIR}/apps/traefik-dashboard/auth" ]]; then
+    if [[ -f "${K8S_REPO_DIR}/apps/traefik-dashboard/auth" ]]; then
       kubectl -n traefik create secret generic traefik-dashboard-auth \
-        --from-file=users="${INSTALL_DIR}/apps/traefik-dashboard/auth" \
+        --from-file=users="${K8S_REPO_DIR}/apps/traefik-dashboard/auth" \
         --dry-run=client -o yaml | kubectl apply -f -
-      kubectl apply -f "${INSTALL_DIR}/apps/traefik-dashboard/dashboard-middlewares.yaml"
-      kubectl apply -f "${INSTALL_DIR}/apps/traefik-dashboard/dashbaord-routes-ingress.yaml"
-      kubectl apply -f "${INSTALL_DIR}/apps/traefik-dashboard/metrics-routes.yaml"
+      kubectl apply -f "${K8S_REPO_DIR}/apps/traefik-dashboard/dashboard-middlewares.yaml"
+      kubectl apply -f "${K8S_REPO_DIR}/apps/traefik-dashboard/dashbaord-routes-ingress.yaml"
+      kubectl apply -f "${K8S_REPO_DIR}/apps/traefik-dashboard/metrics-routes.yaml"
     fi
 
     if [[ "${INSTALL_NGINX}" == "true" ]]; then
-      log "Linking nginx reverse proxy config from repo"
-      NGINX_SOURCE_CONFIG="${INSTALL_DIR}/infrastructure/nginx/kubequest.conf"
-      NGINX_TARGET_CONFIG="/etc/nginx/conf.d/kubequest.conf"
+      log "Linking nginx conf.d tree from repo"
+      NGINX_SOURCE_DIR="${K8S_REPO_DIR}/nginx/conf.d"
+      NGINX_TARGET_DIR="/etc/nginx/conf.d"
 
-      if [[ ! -f "${NGINX_SOURCE_CONFIG}" ]]; then
-        echo "Missing nginx source config: ${NGINX_SOURCE_CONFIG}"
+      if [[ ! -d "${NGINX_SOURCE_DIR}" ]]; then
+        echo "Missing nginx source directory: ${NGINX_SOURCE_DIR}"
         exit 1
       fi
 
-      ln -sfn "${NGINX_SOURCE_CONFIG}" "${NGINX_TARGET_CONFIG}"
+      mkdir -p "${NGINX_TARGET_DIR}/sites-enabled" "${NGINX_TARGET_DIR}/snippets" "${NGINX_TARGET_DIR}/upstreams"
+      find "${NGINX_TARGET_DIR}" -maxdepth 1 -type l -delete
+      find "${NGINX_TARGET_DIR}/sites-enabled" -maxdepth 1 -type l -delete
+      find "${NGINX_TARGET_DIR}/snippets" -maxdepth 1 -type l -delete
+      find "${NGINX_TARGET_DIR}/upstreams" -maxdepth 1 -type l -delete
+      ln -sfn "${NGINX_SOURCE_DIR}/default.conf" "${NGINX_TARGET_DIR}/default.conf"
+      ln -sfn "${NGINX_SOURCE_DIR}/sites-enabled/registry.kwer.fr.conf" "${NGINX_TARGET_DIR}/sites-enabled/registry.kwer.fr.conf"
+      ln -sfn "${NGINX_SOURCE_DIR}/sites-enabled/whoami.kwer.fr.conf" "${NGINX_TARGET_DIR}/sites-enabled/whoami.kwer.fr.conf"
+      ln -sfn "${NGINX_SOURCE_DIR}/snippets/proxy-traefik.conf" "${NGINX_TARGET_DIR}/snippets/proxy-traefik.conf"
+      ln -sfn "${NGINX_SOURCE_DIR}/upstreams/traefik.conf" "${NGINX_TARGET_DIR}/upstreams/traefik.conf"
       nginx -t
       systemctl enable --now nginx
       systemctl restart nginx

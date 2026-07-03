@@ -1,5 +1,6 @@
 defaultSettings:
   defaultReplicaCount: 2
+  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
 
 persistence:
   defaultClass: true
