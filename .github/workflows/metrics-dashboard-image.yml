@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: registry.kwer.fr
-  IMAGE_NAME: metrics-dashboard
+  IMAGE_NAME: kubequest/prod/metrics-dashboard
   CONTEXT: kubernetes/apps/metrics/dashboard/html
 
 jobs:
