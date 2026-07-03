@@ -1,0 +1,19 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+    name: metrics-dashboard-route
+    namespace: metrics-dashboard
+spec:
+    parentRefs:
+        - name: cluster-edge-gateway
+          namespace: traefik
+    hostnames:
+        - metrics.kwer.fr
+    rules:
+        - matches:
+              - path:
+                    type: PathPrefix
+                    value: /
+          backendRefs:
+              - name: metrics-dashboard
+                port: 80
