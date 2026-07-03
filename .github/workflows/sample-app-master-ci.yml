@@ -2,7 +2,13 @@ name: sample-app-master-ci
 
 on:
   push:
+    paths:
+      - 'sample-app-master/**'
+      - '.github/workflows/sample-app-master-ci.yml'
   pull_request:
+    paths:
+      - 'sample-app-master/**'
+      - '.github/workflows/sample-app-master-ci.yml'
 
 jobs:
   test:
