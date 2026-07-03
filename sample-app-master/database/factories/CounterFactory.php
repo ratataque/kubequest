@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Models\Counter;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 class CounterFactory extends Factory
 {
@@ -17,7 +17,7 @@ class CounterFactory extends Factory
     /**
      * Create a new factory instance for the model.
      *
-     * @return \Illuminate\Database\Eloquent\Factories\Factory
+     * @return Factory
      */
     protected static function newFactory()
     {
@@ -32,7 +32,7 @@ class CounterFactory extends Factory
     public function definition()
     {
         return [
-            'counter' => 1
+            'counter' => 1,
         ];
     }
 }

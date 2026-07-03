@@ -16,5 +16,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     $value = Counter::sum('count');
+
     return view('welcome', ['value' => $value]);
 });
