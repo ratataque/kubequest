@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: registry
-  namespace: registry
+    name: registry
+    namespace: registry
 spec:
   replicas: 1
   strategy:
@@ -53,25 +53,25 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: registry
-  namespace: registry
+    name: registry
+    namespace: registry
 spec:
-  selector:
-    app: registry
-  ports:
-    - name: http
-      port: 5000
-      targetPort: 5000
+    selector:
+        app: registry
+    ports:
+        - name: http
+          port: 5000
+          targetPort: 5000
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: registry-data
-  namespace: registry
+    name: registry-data
+    namespace: registry
 spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: longhorn
-  resources:
-    requests:
-      storage: 15Gi
+    accessModes:
+        - ReadWriteOnce
+    storageClassName: longhorn
+    resources:
+        requests:
+            storage: 15Gi
