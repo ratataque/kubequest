@@ -1,30 +1,45 @@
-# Utilisez une image Docker officielle pour PHP 7.4 avec Apache
-FROM php:8.2.8-apache
+FROM composer:2 AS vendor
 
-# Installez les extensions PHP nécessaires
-RUN docker-php-ext-install pdo_mysql
+WORKDIR /app
 
-RUN apt-get update && apt-get install -y git unzip p7zip-full
+COPY . /app
 
-# Installez Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
-# Copiez les fichiers de l'application dans le conteneur
-COPY . /var/www/html/
+FROM node:20-alpine AS frontend
 
-# Installez les dépendances de l'application
-RUN composer install
+WORKDIR /app
 
-RUN chown -R www-data:www-data /var/www/html/vendor /var/www/html/storage /var/www/html/bootstrap /var/www/html/public /var/www/html/app /var/www/html/config /var/www/html/routes /var/www/html/resources
-RUN chmod -R 755 /var/www/html/vendor /var/www/html/storage /var/www/html/bootstrap /var/www/html/public /var/www/html/app /var/www/html/config /var/www/html/routes /var/www/html/resources
+COPY . /app
 
-# Modifiez la configuration d'Apache pour pointer vers le répertoire public
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+RUN npm ci && npm run production
 
-# Activez le module Apache Rewrite
-RUN a2enmod rewrite
+FROM php:8.2-apache AS runtime
 
-# Exposez le port 80
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git unzip \
+    && docker-php-ext-install pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/www/html
+
+COPY . /var/www/html
+COPY --from=vendor /app/vendor /var/www/html/vendor
+COPY --from=frontend /app/public /var/www/html/public
+
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
+    && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
+    && a2enmod rewrite \
+    && mkdir -p /var/www/html/storage/framework/cache \
+    && mkdir -p /var/www/html/storage/framework/sessions \
+    && mkdir -p /var/www/html/storage/framework/views \
+    && mkdir -p /var/www/html/storage/logs \
+    && mkdir -p /var/www/html/bootstrap/cache \
+    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/vendor /var/www/html/public \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
 EXPOSE 80
+
+CMD ["apache2-foreground"]
