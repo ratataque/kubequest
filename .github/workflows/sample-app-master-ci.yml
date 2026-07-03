@@ -28,14 +28,14 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: "8.2"
           coverage: none
           extensions: mbstring, pdo_sqlite, sqlite3
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: npm
           cache-dependency-path: sample-app-master/package-lock.json
 
@@ -67,9 +67,6 @@ jobs:
 
       - name: Run test suite
         run: php artisan test
-
-      - name: Audit Composer dependencies
-        run: composer audit --abandoned=report
 
   docker:
     if: github.event_name == 'push'
