@@ -14,50 +14,50 @@ spec:
         metadata:
             labels:
                 app: registry
-    tolerations:
-        - key: node.kubernetes.io/not-ready
-          operator: Exists
-          effect: NoExecute
-          tolerationSeconds: 10
-        - key: node.kubernetes.io/unreachable
-          operator: Exists
-          effect: NoExecute
-          tolerationSeconds: 10
-    spec:
-        affinity:
-            nodeAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                    nodeSelectorTerms:
-                        - matchExpressions:
-                              - key: node-role.kubernetes.io/control-plane
-                                operator: DoesNotExist
-        containers:
-            - name: registry
-              image: registry:3
-              env:
-                  - name: REGISTRY_HTTP_RELATIVEURLS
-                    value: "true"
-                  - name: REGISTRY_AUTH
-                    value: htpasswd
-                  - name: REGISTRY_AUTH_HTPASSWD_REALM
-                    value: Registry Realm
-                  - name: REGISTRY_AUTH_HTPASSWD_PATH
-                    value: /auth/htpasswd
-              ports:
-                  - containerPort: 5000
-              volumeMounts:
-                  - name: registry-auth
-                    mountPath: /auth
-                    readOnly: true
-                  - name: registry-data
-                    mountPath: /var/lib/registry
-        volumes:
-            - name: registry-auth
-              secret:
-                  secretName: registry-auth
-            - name: registry-data
-              persistentVolumeClaim:
-                  claimName: registry-data
+        spec:
+            tolerations:
+                - key: node.kubernetes.io/not-ready
+                  operator: Exists
+                  effect: NoExecute
+                  tolerationSeconds: 10
+                - key: node.kubernetes.io/unreachable
+                  operator: Exists
+                  effect: NoExecute
+                  tolerationSeconds: 10
+            affinity:
+                nodeAffinity:
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                        nodeSelectorTerms:
+                            - matchExpressions:
+                                  - key: node-role.kubernetes.io/control-plane
+                                    operator: DoesNotExist
+            containers:
+                - name: registry
+                  image: registry:3
+                  env:
+                      - name: REGISTRY_HTTP_RELATIVEURLS
+                        value: "true"
+                      - name: REGISTRY_AUTH
+                        value: htpasswd
+                      - name: REGISTRY_AUTH_HTPASSWD_REALM
+                        value: Registry Realm
+                      - name: REGISTRY_AUTH_HTPASSWD_PATH
+                        value: /auth/htpasswd
+                  ports:
+                      - containerPort: 5000
+                  volumeMounts:
+                      - name: registry-auth
+                        mountPath: /auth
+                        readOnly: true
+                      - name: registry-data
+                        mountPath: /var/lib/registry
+            volumes:
+                - name: registry-auth
+                  secret:
+                      secretName: registry-auth
+                - name: registry-data
+                  persistentVolumeClaim:
+                      claimName: registry-data
 ---
 apiVersion: v1
 kind: Service
