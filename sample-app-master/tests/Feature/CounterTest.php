@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 
 class CounterTest extends TestCase
@@ -21,7 +19,7 @@ class CounterTest extends TestCase
     }
 
     /** @test */
-    public function getCounterValue()
+    public function get_counter_value()
     {
         $response = $this->get('/api/counter/count');
 
@@ -29,7 +27,7 @@ class CounterTest extends TestCase
     }
 
     /** @test */
-    public function addCounter()
+    public function add_counter()
     {
         $response = $this->get('/api/counter/add');
 
@@ -37,7 +35,7 @@ class CounterTest extends TestCase
     }
 
     /** @test */
-    public function addCounterValue()
+    public function add_counter_value()
     {
         $response = $this->get('/api/counter/add');
 

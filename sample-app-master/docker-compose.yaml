@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.0"
+    image: "traefik:v3.7.6"
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
@@ -22,15 +22,15 @@ services:
     ports:
       - "8081:80"
     environment:
-      APP_DEBUG: "true"
-      APP_ENV: "dev"
-      APP_KEY: "base64:DJYTvaRkEZ/YcQsX3TMpB0iCjgme2rhlIOus9A1hnj4="
-      DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: app_database
-      DB_USERNAME: app_user
-      DB_PASSWORD: app_password
+      APP_DEBUG: ${APP_DEBUG}
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      DB_CONNECTION: ${DB_CONNECTION}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
     depends_on:
       - db
     labels:
@@ -41,14 +41,14 @@ services:
     restart: unless-stopped
     command: --default-authentication-plugin=mysql_native_password
     environment:
-      MYSQL_DATABASE: app_database
-      MYSQL_USER: app_user
-      MYSQL_PASSWORD: app_password
-      MYSQL_ROOT_PASSWORD: app_root_password
-      MYSQL_TCP_PORT: 3306
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_TCP_PORT: ${DB_PORT}
     volumes:
       - db_data:/var/lib/mysql
-      - ./mysql-init:/docker-entrypoint-initdb.d  # Permet d'exécuter des scripts SQL initiaux
+      - ./mysql-init:/docker-entrypoint-initdb.d # Permet d'exécuter des scripts SQL initiaux
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 5s
