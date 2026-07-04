@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: service/sample-app-master
+        working-directory: services/sample-app-master
     env:
       APP_ENV: testing
       APP_DEBUG: true
@@ -48,7 +48,7 @@ jobs:
       - name: Prepare environment
         run: |
           cp .env.example .env
-          touch  $DB_DATABASE"
+          touch "$DB_DATABASE"
 
       - name: Validate Composer files
         run: composer validate --strict
@@ -107,8 +107,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: service/sample-app-master
-          file: service/sample-app-master/Dockerfile
+          context: services/sample-app-master
+          file: services/sample-app-master/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
