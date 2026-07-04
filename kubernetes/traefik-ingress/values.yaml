@@ -27,9 +27,4 @@ api:
     basePath: /traefik
 
 gateway:
-    listeners:
-        web:
-            port: 8000
-            protocol: HTTP
-            namespacePolicy:
-                from: All
+    listeners: {}
