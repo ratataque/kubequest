@@ -178,6 +178,17 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       -l app.kubernetes.io/name=argocd-server \
       --timeout=300s
 
+    log "Installing Sealed Secrets controller"
+    helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets >/dev/null 2>&1 || true
+    helm repo update
+    helm upgrade --install sealed-secrets-controller sealed-secrets/sealed-secrets \
+      --namespace sealed-secrets \
+      --create-namespace \
+      --set-string fullnameOverride=sealed-secrets-controller
+    kubectl -n sealed-secrets wait --for=condition=Available deployment \
+      -l app.kubernetes.io/name=sealed-secrets \
+      --timeout=300s
+
     log "Applying infra and app manifests"
     kubectl apply -f "${K8S_REPO_DIR}/infrastructure/gateway.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/infrastructure/argocd/reference-grant.yaml"
