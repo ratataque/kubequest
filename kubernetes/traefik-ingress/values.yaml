@@ -24,6 +24,7 @@ ports:
 api:
   dashboard: true
   insecure: false
+  basePath: /traefik
 
 gateway:
   listeners: {}

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
     name: metrics-dashboard
-    namespace: metrics-dashboard
+    namespace: metrics
 spec:
     replicas: 1
     selector:
@@ -24,7 +24,7 @@ apiVersion: v1
 kind: Service
 metadata:
     name: metrics-dashboard
-    namespace: metrics-dashboard
+    namespace: metrics
 spec:
     selector:
         app: metrics-dashboard

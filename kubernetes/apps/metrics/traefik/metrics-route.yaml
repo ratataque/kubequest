@@ -1,16 +1,17 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: traefik-dashboard
+  name: traefik-metrics
   namespace: traefik
 spec:
   entryPoints:
     - web
   routes:
-    - match: PathPrefix(`/api`) || PathPrefix(`/dashboard`)
+    - match: PathPrefix(`/traefik/metrics`)
       kind: Rule
       services:
-        - name: api@internal
+        - name: prometheus@internal
           kind: TraefikService
       middlewares:
-        - name: auth
+        - name: metrics-basic-auth
+        - name: strip-first-segment
