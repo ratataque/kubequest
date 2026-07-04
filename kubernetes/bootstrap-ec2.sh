@@ -180,6 +180,8 @@ if [[ "${ROLE}" == "control-plane" ]]; then
 
     log "Applying infra and app manifests"
     kubectl apply -f "${K8S_REPO_DIR}/infrastructure/gateway.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/argocd/reference-grant.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/argocd/http-route.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/whoami/deployement.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/whoami/http-route.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/registry/registry-auth.secret.yaml"
