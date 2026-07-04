@@ -167,6 +167,17 @@ if [[ "${ROLE}" == "control-plane" ]]; then
     kubectl -n longhorn-system wait --for=condition=Ready pod --all --timeout=600s
     kubectl get sc longhorn >/dev/null
 
+    log "Installing Argo CD"
+    helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
+    helm repo update
+    helm upgrade --install argocd argo/argo-cd \
+      --namespace argocd \
+      --create-namespace \
+      -f "${K8S_REPO_DIR}/infrastructure/argocd/values.yaml"
+    kubectl -n argocd wait --for=condition=Available deployment \
+      -l app.kubernetes.io/name=argocd-server \
+      --timeout=300s
+
     log "Applying infra and app manifests"
     kubectl apply -f "${K8S_REPO_DIR}/infrastructure/gateway.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/whoami/deployement.yaml"
