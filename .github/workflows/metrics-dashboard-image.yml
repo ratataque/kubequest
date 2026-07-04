@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - kubernetes/apps/metrics/dashboard/html/**
+      - services/metrics-dashboard/**
       - .github/workflows/metrics-dashboard-image.yml
   workflow_dispatch:
 
 env:
   REGISTRY: registry.kwer.fr
   IMAGE_NAME: kubequest/prod/metrics-dashboard
-  CONTEXT: kubernetes/apps/metrics/dashboard/html
+  CONTEXT: services/metrics-dashboard/
 
 jobs:
   build-and-push:
