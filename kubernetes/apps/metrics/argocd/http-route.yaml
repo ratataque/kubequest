@@ -14,17 +14,6 @@ spec:
         - path:
             type: PathPrefix
             value: /argocd
-      filters:
-        - type: ExtensionRef
-          extensionRef:
-            group: traefik.io
-            kind: Middleware
-            name: strip-first-segment
-        - type: ExtensionRef
-          extensionRef:
-            group: traefik.io
-            kind: Middleware
-            name: metrics-basic-auth
       backendRefs:
         - name: argocd-server
           port: 80
