@@ -1,31 +1,36 @@
 providers:
-  kubernetesIngress:
-    enabled: false
-  kubernetesCRD:
-    enabled: true
-    allowCrossNamespace: true
-  kubernetesGateway:
-    enabled: true
+    kubernetesIngress:
+        enabled: false
+    kubernetesCRD:
+        enabled: true
+    kubernetesGateway:
+        enabled: true
 
 service:
-  type: NodePort
+    type: NodePort
 
 ports:
-  web:
-    port: 8000
-    expose:
-      enabled: true
-    nodePort: 30080
-  websecure:
-    port: 8443
-    expose:
-      enabled: true
-    nodePort: 30443
+    web:
+        port: 8000
+        expose:
+            enabled: true
+        nodePort: 30080
+    websecure:
+        port: 8443
+        expose:
+            enabled: true
+        nodePort: 30443
 
 api:
-  dashboard: true
-  insecure: false
-  basePath: /traefik
+    dashboard: true
+    insecure: false
+    basePath: /traefik
 
 gateway:
-  listeners: {}
+    listeners:
+        web:
+            namespacePolicy:
+                from: All
+        websecure:
+            namespacePolicy:
+                from: All
