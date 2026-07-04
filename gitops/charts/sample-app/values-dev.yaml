@@ -1,0 +1,13 @@
+image:
+  repository: registry.kwer.fr/kubequest/dev/sample-app-master
+  tag: latest
+
+imagePullSecrets:
+  - name: registry-pull-secret
+
+ingress:
+  enabled: false
+
+secret:
+  create: false
+  existingSecret: sample-app-env

@@ -1,0 +1,49 @@
+replicaCount: 1
+
+image:
+  repository: registry.kwer.fr/kubequest/prod/sample-app-master
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 80
+
+mysql:
+  enabled: true
+  image:
+    repository: mysql
+    tag: "8.0"
+    pullPolicy: IfNotPresent
+  service:
+    port: 3306
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClassName: ""
+  auth:
+    rootPasswordKey: DB_PASSWORD
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts: []
+
+resources: {}
+
+secret:
+  create: true
+  existingSecret: ""
+  data:
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_KEY: ""
+    DB_CONNECTION: mysql
+    DB_HOST: ""
+    DB_PORT: "3306"
+    DB_DATABASE: ""
+    DB_USERNAME: ""
+    DB_PASSWORD: ""

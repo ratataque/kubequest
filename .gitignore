@@ -1,3 +1,5 @@
 .kube
 .ssh
 .omo
+
+*.secret.yaml
