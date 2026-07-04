@@ -20,6 +20,11 @@ spec:
                     group: traefik.io
                     kind: Middleware
                     name: strip-first-segment
+              - type: ExtensionRef
+                extensionRef:
+                    group: traefik.io
+                    kind: Middleware
+                    name: metrics-basic-auth
           backendRefs:
               - name: longhorn-frontend
                 port: 80
