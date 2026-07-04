@@ -1,0 +1,25 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+    name: metrics-longhorn-route
+    namespace: longhorn-system
+spec:
+    parentRefs:
+        - name: cluster-edge-gateway
+          namespace: traefik
+    hostnames:
+        - metrics.kwer.fr
+    rules:
+        - matches:
+              - path:
+                    type: PathPrefix
+                    value: /longhorn
+          filters:
+              - type: ExtensionRef
+                extensionRef:
+                    group: traefik.io
+                    kind: Middleware
+                    name: strip-first-segment
+          backendRefs:
+              - name: longhorn-frontend
+                port: 80
