@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: sample-app-master
+        working-directory: service/sample-app-master
     env:
       APP_ENV: testing
       APP_DEBUG: true
@@ -107,8 +107,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: ./sample-app-master
-          file: ./sample-app-master/Dockerfile
+          context: service/sample-app-master
+          file: service/sample-app-master/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
