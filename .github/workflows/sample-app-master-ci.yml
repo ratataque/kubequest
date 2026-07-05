@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: read
+      pull-requests: write
     steps:
       - name: Checkout dev branch
         uses: actions/checkout@v4
@@ -134,6 +134,27 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
+      - name: Prepare image tags
+        id: tags
+        run: |
+          if [ "${{ steps.context.outputs.mode }}" = "release" ]; then
+            {
+              echo 'tags<<EOF'
+              echo 'registry.kwer.fr/kubequest/dev/sample-app-master:${{ steps.context.outputs.chart_app_version }}'
+              echo 'registry.kwer.fr/kubequest/prod/sample-app-master:${{ steps.context.outputs.chart_app_version }}'
+              echo 'registry.kwer.fr/kubequest/dev/sample-app-master:sha-${{ github.event.pull_request.merge_commit_sha }}'
+              echo 'registry.kwer.fr/kubequest/prod/sample-app-master:sha-${{ github.event.pull_request.merge_commit_sha }}'
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo 'tags<<EOF'
+              echo 'registry.kwer.fr/kubequest/dev/sample-app-master:${{ steps.context.outputs.chart_app_version }}'
+              echo 'registry.kwer.fr/kubequest/dev/sample-app-master:sha-${{ github.event.pull_request.merge_commit_sha }}'
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create git release tag
         if: steps.context.outputs.mode == 'release'
         run: |
@@ -147,15 +168,6 @@ jobs:
           git tag "${{ steps.context.outputs.release_tag }}"
           git push origin "${{ steps.context.outputs.release_tag }}"
 
-      - name: Generate image metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: registry.kwer.fr/kubequest/dev/sample-app-master
-          tags: |
-            type=raw,value=${{ steps.context.outputs.chart_app_version }}
-            type=sha,prefix=sha-
-
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
@@ -163,24 +175,37 @@ jobs:
           file: services/sample-app-master/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Update chart version
         run: |
-          APP_VERSION='${{ steps.context.outputs.chart_app_version }}' python3 -c "import os, re, pathlib; app_version = os.environ['APP_VERSION']; values_path = pathlib.Path('gitops/charts/sample-app/values-dev.yaml'); values = values_path.read_text(encoding='utf-8'); values = re.sub(r'(^image:\n(?:  .*\n)*?  tag:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE); values = re.sub(r'(^migration:\n(?:  .*\n)*?  releaseId:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE); values_path.write_text(values, encoding='utf-8')"
+          APP_VERSION='${{ steps.context.outputs.chart_app_version }}' MODE='${{ steps.context.outputs.mode }}' python3 -c "import os, re, pathlib; app_version = os.environ['APP_VERSION']; mode = os.environ['MODE']; dev_path = pathlib.Path('gitops/charts/sample-app/values-dev.yaml'); dev_values = dev_path.read_text(encoding='utf-8'); dev_values = re.sub(r'(^image:\n(?:  .*\n)*?  tag:\s*).+$', rf'\g<1>{app_version}', dev_values, flags=re.MULTILINE); dev_values = re.sub(r'(^migration:\n(?:  .*\n)*?  releaseId:\s*).+$', rf'\g<1>{app_version}', dev_values, flags=re.MULTILINE); dev_path.write_text(dev_values, encoding='utf-8'); prod_path = pathlib.Path('gitops/charts/sample-app/values-prod.yaml'); prod_values = prod_path.read_text(encoding='utf-8'); prod_values = re.sub(r'(^image:\n(?:  .*\n)*?  tag:\s*).+$', rf'\g<1>{app_version}', prod_values, flags=re.MULTILINE); prod_values = re.sub(r'(^migration:\n(?:  .*\n)*?  releaseId:\s*).+$', rf'\g<1>{app_version}', prod_values, flags=re.MULTILINE); prod_path.write_text(prod_values, encoding='utf-8') if mode == 'release' else None"
 
       - name: Commit chart version update
         run: |
-          if git diff --quiet -- gitops/charts/sample-app/values-dev.yaml; then
-            echo "No values-dev version changes to commit"
+          if git diff --quiet -- gitops/charts/sample-app/values-dev.yaml gitops/charts/sample-app/values-prod.yaml; then
+            echo "No sample-app version changes to commit"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add gitops/charts/sample-app/values-dev.yaml
-          git commit -m "chore(sample-app): set dev app version ${{ steps.context.outputs.chart_app_version }}"
+          git add gitops/charts/sample-app/values-dev.yaml gitops/charts/sample-app/values-prod.yaml
+          git commit -m "chore(sample-app): set app version ${{ steps.context.outputs.chart_app_version }}"
           git push
+
+      - name: Promote dev to main
+        if: steps.context.outputs.mode == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number')
+
+          if [ -z "$pr_number" ]; then
+            pr_url=$(gh pr create --base main --head dev --title "Promote sample-app release ${{ steps.context.outputs.chart_app_version }}" --body "Automated promotion from dev to main for sample-app release ${{ steps.context.outputs.chart_app_version }}.")
+            pr_number=$(printf '%s' "$pr_url" | awk -F/ '{print $NF}')
+          fi
+
+          gh pr merge "$pr_number" --merge --delete-branch=false
