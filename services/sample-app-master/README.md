@@ -2,11 +2,11 @@
 
 - Utilise une base mysql
 - Site en PHP
-- Gestion schéma DB 
+- Gestion schéma DB
 - Tests
 - Déploiement kube
 
-## Avant tout votre fichier .env 
+## Avant tout votre fichier .env
 
 Créer un fichier .env dans le dossier sample-app du repo
 
@@ -19,13 +19,13 @@ DB_USERNAME=username
 DB_PASSWORD=passwd
 ```
 
-## Création du schéma 
+## Création du schéma
 
 ```bash
 php artisan migrate
 ```
 
-## Seed du jeu de données 
+## Seed du jeu de données
 
 ```bash
 php artisan db:seed
@@ -38,3 +38,5 @@ Pour lancer le seed manuellement dans Kubernetes:
 ```bash
 kubectl exec -n sample-app-prod deploy/sample-app -- php artisan db:seed --force
 ```
+
+test=1
