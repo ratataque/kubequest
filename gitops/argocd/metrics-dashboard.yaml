@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/ratataque/kubequest
-    targetRevision: main
+    targetRevision: dev
     path: gitops/charts/metrics-dashboard
     helm:
       valueFiles:
