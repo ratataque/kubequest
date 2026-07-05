@@ -8,11 +8,11 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "metrics-dashboard.name" . }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      app: {{ include "metrics-dashboard.fullname" . }}
   template:
     metadata:
       labels:
+        app: {{ include "metrics-dashboard.fullname" . }}
         app.kubernetes.io/name: {{ include "metrics-dashboard.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:

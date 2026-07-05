@@ -6,8 +6,7 @@ metadata:
     {{- include "metrics-dashboard.labels" . | nindent 4 }}
 spec:
   selector:
-    app.kubernetes.io/name: {{ include "metrics-dashboard.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: {{ include "metrics-dashboard.fullname" . }}
   ports:
     - name: http
       port: {{ .Values.service.port }}
