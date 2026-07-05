@@ -87,6 +87,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Log in to registry.kwer.fr
         uses: docker/login-action@v3
         with:
@@ -109,6 +112,7 @@ jobs:
         with:
           context: services/sample-app-master
           file: services/sample-app-master/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
