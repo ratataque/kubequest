@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: registry.kwer.fr/kubequest/prod/sample-app-master
-  tag: latest
+  tag: 0.1.0
 
 imagePullSecrets:
   - name: registry-pull-secret
@@ -13,3 +13,6 @@ ingress:
 secret:
   create: false
   existingSecret: sample-app-env
+
+migration:
+  releaseId: 0.1.0

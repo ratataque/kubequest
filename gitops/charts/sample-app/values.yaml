@@ -47,3 +47,7 @@ secret:
     DB_DATABASE: ""
     DB_USERNAME: ""
     DB_PASSWORD: ""
+
+migration:
+  enabled: true
+  releaseId: default

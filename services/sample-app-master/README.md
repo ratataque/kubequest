@@ -30,3 +30,11 @@ php artisan migrate
 ```bash
 php artisan db:seed
 ```
+
+## Kubernetes
+
+Pour lancer le seed manuellement dans Kubernetes:
+
+```bash
+kubectl exec -n sample-app-prod deploy/sample-app -- php artisan db:seed --force
+```

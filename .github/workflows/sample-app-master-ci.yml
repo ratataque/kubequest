@@ -1,17 +1,18 @@
 name: sample-app-master-ci
 
 on:
-  push:
-    paths:
-      - services/sample-app-master/**
-      - .github/workflows/sample-app-master-ci.yml
   pull_request:
+    types:
+      - closed
+    branches:
+      - dev
     paths:
       - services/sample-app-master/**
       - .github/workflows/sample-app-master-ci.yml
 
 jobs:
   test:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -75,14 +78,93 @@ jobs:
         run: php artisan test
 
   docker:
-    if: github.event_name == 'push'
+    if: github.event.pull_request.merged == true
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+      pull-requests: read
     steps:
-      - name: Checkout
+      - name: Checkout dev branch
         uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Resolve release context
+        id: context
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          current_core_version=$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          content = Path('gitops/charts/sample-app/values-dev.yaml').read_text(encoding='utf-8')
+          match = re.search(r'^  tag:\s*([0-9]+\.[0-9]+\.[0-9]+)(?:[-+].*)?\s*$', content, flags=re.MULTILINE)
+          if match:
+              print(match.group(1))
+          else:
+              print('0.0.0')
+          PY
+          )
+
+          pr_number='${{ github.event.pull_request.number }}'
+          release_labels=$(gh pr view "$pr_number" --json labels --jq '.labels[].name' | tr '[:upper:]' '[:lower:]' | grep -E '^(version-major|version-minor|version-hot)$' || true)
+          release_label_count=$(printf '%s\n' "$release_labels" | sed '/^$/d' | wc -l | tr -d ' ')
+
+          if [ "$release_label_count" = "1" ]; then
+            release_label=$(printf '%s\n' "$release_labels" | sed '/^$/d' | head -n 1)
+            current_release=$(python3 - <<'PY'
+            import re
+            import subprocess
+
+            output = subprocess.check_output(['git', 'tag', '--list', 'v*'], text=True)
+            versions = []
+            for raw in output.splitlines():
+                match = re.fullmatch(r'v(\d+)\.(\d+)\.(\d+)', raw.strip())
+                if match:
+                    versions.append(tuple(int(x) for x in match.groups()))
+
+            if versions:
+                major, minor, patch = max(versions)
+                print(f'{major}.{minor}.{patch}')
+            else:
+                print('0.0.0')
+            PY
+            )
+
+            next_version=$(CURRENT_VERSION="$current_release" RELEASE_LABEL="$release_label" python3 - <<'PY'
+            import os
+
+            major, minor, patch = [int(x) for x in os.environ['CURRENT_VERSION'].split('.')]
+            label = os.environ['RELEASE_LABEL']
+
+            if label == 'version-major':
+                major, minor, patch = major + 1, 0, 0
+            elif label == 'version-minor':
+                major, minor, patch = major, minor + 1, 0
+            elif label == 'version-hot':
+                major, minor, patch = major, minor, patch + 1
+            else:
+                raise SystemExit(f'Unsupported release label: {label}')
+
+            print(f'{major}.{minor}.{patch}')
+            PY
+            )
+
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "chart_version=$next_version" >> "$GITHUB_OUTPUT"
+            echo "chart_app_version=$next_version" >> "$GITHUB_OUTPUT"
+            echo "release_tag=v$next_version" >> "$GITHUB_OUTPUT"
+          else
+            short_sha=$(printf '%s' '${{ github.event.pull_request.merge_commit_sha }}' | cut -c1-12)
+            dev_version="${current_core_version}-dev.${short_sha}"
+            echo "mode=dev" >> "$GITHUB_OUTPUT"
+            echo "chart_version=$dev_version" >> "$GITHUB_OUTPUT"
+            echo "chart_app_version=$dev_version" >> "$GITHUB_OUTPUT"
+            echo "release_tag=" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -97,15 +179,27 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
+      - name: Create git release tag
+        if: steps.context.outputs.mode == 'release'
+        run: |
+          if git rev-parse "${{ steps.context.outputs.release_tag }}" >/dev/null 2>&1; then
+            echo "Git tag ${{ steps.context.outputs.release_tag }} already exists"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.context.outputs.release_tag }}"
+          git push origin "${{ steps.context.outputs.release_tag }}"
+
       - name: Generate image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: registry.kwer.fr/kubequest/prod/sample-app-master
+          images: registry.kwer.fr/kubequest/dev/sample-app-master
           tags: |
+            type=raw,value=${{ steps.context.outputs.chart_app_version }}
             type=sha,prefix=sha-
-            type=ref,event=branch
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -118,3 +212,32 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Update chart version
+        run: |
+          APP_VERSION='${{ steps.context.outputs.chart_app_version }}' python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          app_version = os.environ['APP_VERSION']
+
+          values_path = Path('gitops/charts/sample-app/values-dev.yaml')
+          values = values_path.read_text(encoding='utf-8')
+          values = re.sub(r'(^image:\n(?:  .*\n)*?  tag:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE)
+          values = re.sub(r'(^migration:\n(?:  .*\n)*?  releaseId:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE)
+          values_path.write_text(values, encoding='utf-8')
+          PY
+
+      - name: Commit chart version update
+        run: |
+          if git diff --quiet -- gitops/charts/sample-app/values-dev.yaml; then
+            echo "No values-dev version changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gitops/charts/sample-app/values-dev.yaml
+          git commit -m "chore(sample-app): set dev app version ${{ steps.context.outputs.chart_app_version }}"
+          git push

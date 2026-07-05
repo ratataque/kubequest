@@ -1,10 +1,10 @@
+{{- if .Values.migration.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "sample-app.fullname" . }}-migrate
+  name: {{ include "sample-app.fullname" . }}-migrate-{{ .Values.migration.releaseId | replace "." "-" | replace "/" "-" | lower }}
   annotations:
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     {{- include "sample-app.labels" . | nindent 4 }}
 spec:
@@ -36,4 +36,4 @@ spec:
                 sleep 5
               done
               php artisan migrate --force
-              php artisan db:seed --force
+{{- end }}

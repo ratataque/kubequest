@@ -1,0 +1,39 @@
+name: sample-app-release-prep
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
+    branches:
+      - dev
+    paths:
+      - services/sample-app-master/**
+      - gitops/charts/sample-app/**
+      - .github/workflows/sample-app-release-prep.yml
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate-release-intent:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = (context.payload.pull_request.labels || []).map((l) => l.name.toLowerCase());
+            const candidates = ['version-major', 'version-minor', 'version-hot'];
+            const matched = candidates.filter((c) => labels.includes(c));
+
+            if (matched.length > 1) {
+              core.setFailed(`Expected at most one release label among ${candidates.join(', ')}. Found: ${matched.join(', ')}`);
+              return;
+            }
+
+            if (matched.length === 1) {
+              core.info(`Validated release label: ${matched[0]}`);
+            } else {
+              core.info('No release label set. This PR will publish a dev SHA-suffixed version when merged.');
+            }
