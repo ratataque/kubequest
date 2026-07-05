@@ -8,6 +8,10 @@ imagePullSecrets:
 ingress:
   enabled: false
 
+httpRoute:
+  enabled: true
+  hostname: dev.kwer.fr
+
 secret:
   create: false
   existingSecret: sample-app-env

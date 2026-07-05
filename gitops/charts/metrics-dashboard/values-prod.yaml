@@ -1,0 +1,6 @@
+image:
+  tag: 0.1.0
+
+httpRoute:
+  enabled: true
+  hostname: metrics.kwer.fr

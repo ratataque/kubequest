@@ -1,14 +1,12 @@
 name: metrics-dashboard-image
 
 on:
-  pull_request:
-    types:
-      - closed
+  push:
     branches:
-      - dev
+      - main
     paths:
       - services/metrics-dashboard/**
-      - .github/workflows/sample-app-master-ci.yml
+      - .github/workflows/metrics-dashboard-image.yml
   workflow_dispatch:
 
 env:
@@ -20,11 +18,13 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -39,14 +39,21 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
+      - name: Compute release version
+        id: version
+        run: |
+          current_version=$(python3 -c "import re, pathlib; content = pathlib.Path('gitops/charts/metrics-dashboard/Chart.yaml').read_text(encoding='utf-8'); match = re.search(r'^version:\\s*([0-9]+\\.[0-9]+\\.[0-9]+)\\s*$', content, flags=re.MULTILINE); print(match.group(1) if match else '0.0.0')")
+          next_version=$(CURRENT_VERSION="$current_version" python3 -c "import os; major, minor, patch = [int(x) for x in os.environ['CURRENT_VERSION'].split('.')]; print(f'{major}.{minor}.{patch + 1}')")
+          echo "version=$next_version" >> "$GITHUB_OUTPUT"
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
             type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -57,3 +64,20 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Update chart version and values for Argo CD
+        run: |
+          VERSION='${{ steps.version.outputs.version }}' python3 -c "import os, re, pathlib; version = os.environ['VERSION']; chart_path = pathlib.Path('gitops/charts/metrics-dashboard/Chart.yaml'); chart = chart_path.read_text(encoding='utf-8'); chart = re.sub(r'^version:\s*[0-9]+\.[0-9]+\.[0-9]+\s*$', f'version: {version}', chart, flags=re.MULTILINE); chart = re.sub(r'^appVersion:\s*.*$', f'appVersion: \"{version}\"', chart, flags=re.MULTILINE); chart_path.write_text(chart, encoding='utf-8'); values_path = pathlib.Path('gitops/charts/metrics-dashboard/values-prod.yaml'); values = values_path.read_text(encoding='utf-8'); values = re.sub(r'(^image:\n(?:  .*\n)*?  tag:\s*).+$', rf'\g<1>{version}', values, flags=re.MULTILINE); values_path.write_text(values, encoding='utf-8')"
+
+      - name: Commit chart update
+        run: |
+          if git diff --quiet -- gitops/charts/metrics-dashboard/Chart.yaml gitops/charts/metrics-dashboard/values-prod.yaml; then
+            echo "No metrics-dashboard version changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gitops/charts/metrics-dashboard/Chart.yaml gitops/charts/metrics-dashboard/values-prod.yaml
+          git commit -m "chore(metrics-dashboard): set app version ${{ steps.version.outputs.version }}"
+          git push

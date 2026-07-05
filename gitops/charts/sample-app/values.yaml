@@ -21,7 +21,7 @@ mysql:
     port: 3306
   persistence:
     enabled: true
-    size: 8Gi
+    size: 4Gi
     storageClassName: ""
   auth:
     rootPasswordKey: DB_PASSWORD
@@ -31,6 +31,13 @@ ingress:
   className: nginx
   annotations: {}
   hosts: []
+
+httpRoute:
+  enabled: false
+  hostname: ""
+  gateway:
+    name: cluster-edge-gateway
+    namespace: traefik
 
 resources: {}
 

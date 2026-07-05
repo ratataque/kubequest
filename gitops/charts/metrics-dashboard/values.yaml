@@ -1,0 +1,19 @@
+replicaCount: 1
+
+image:
+  repository: registry.kwer.fr/kubequest/prod/metrics-dashboard
+  tag: 0.1.0
+  pullPolicy: Always
+
+imagePullSecrets: []
+
+service:
+  port: 80
+  targetPort: 80
+
+httpRoute:
+  enabled: true
+  hostname: metrics.kwer.fr
+  gateway:
+    name: cluster-edge-gateway
+    namespace: traefik
