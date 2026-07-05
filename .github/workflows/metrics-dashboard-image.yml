@@ -1,12 +1,14 @@
 name: metrics-dashboard-image
 
 on:
-  push:
+  pull_request:
+    types:
+      - merged
     branches:
-      - main
+      - dev
     paths:
       - services/metrics-dashboard/**
-      - .github/workflows/metrics-dashboard-image.yml
+      - .github/workflows/sample-app-master-ci.yml
   workflow_dispatch:
 
 env:
