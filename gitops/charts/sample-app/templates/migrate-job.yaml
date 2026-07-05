@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "sample-app.fullname" . }}-migrate
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+  labels:
+    {{- include "sample-app.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        {{- include "sample-app.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "sample-app.secretName" . }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until php -r 'exit((int)!@fsockopen(getenv("DB_HOST"), (int)getenv("DB_PORT"), $errno, $errstr, 5));'; do
+                echo "waiting for mysql at ${DB_HOST}:${DB_PORT}"
+                sleep 5
+              done
+              php artisan migrate --force
+              php artisan db:seed --force
