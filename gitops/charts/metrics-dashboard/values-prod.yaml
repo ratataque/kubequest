@@ -1,6 +1,9 @@
 image:
   tag: 0.1.2
 
+imagePullSecrets:
+  - name: registry-pull-secret
+
 httpRoute:
   enabled: true
   hostname: metrics.kwer.fr
