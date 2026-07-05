@@ -96,18 +96,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          current_core_version=$(python3 - <<'PY'
-          import re
-          from pathlib import Path
-
-          content = Path('gitops/charts/sample-app/values-dev.yaml').read_text(encoding='utf-8')
-          match = re.search(r'^  tag:\s*([0-9]+\.[0-9]+\.[0-9]+)(?:[-+].*)?\s*$', content, flags=re.MULTILINE)
-          if match:
-              print(match.group(1))
-          else:
-              print('0.0.0')
-          PY
-          )
+          current_core_version=$(python3 -c "import re, pathlib; content = pathlib.Path('gitops/charts/sample-app/values-dev.yaml').read_text(encoding='utf-8'); match = re.search(r'^  tag:\\s*([0-9]+\\.[0-9]+\\.[0-9]+)(?:[-+].*)?\\s*$', content, flags=re.MULTILINE); print(match.group(1) if match else '0.0.0')")
 
           pr_number='${{ github.event.pull_request.number }}'
           release_labels=$(gh pr view "$pr_number" --json labels --jq '.labels[].name' | tr '[:upper:]' '[:lower:]' | grep -E '^(version-major|version-minor|version-hot)$' || true)
@@ -115,43 +104,9 @@ jobs:
 
           if [ "$release_label_count" = "1" ]; then
             release_label=$(printf '%s\n' "$release_labels" | sed '/^$/d' | head -n 1)
-            current_release=$(python3 - <<'PY'
-            import re
-            import subprocess
+            current_release=$(python3 -c "import re, subprocess; output = subprocess.check_output(['git', 'tag', '--list', 'v*'], text=True); versions = [tuple(int(x) for x in m.groups()) for line in output.splitlines() if (m := re.fullmatch(r'v(\\d+)\\.(\\d+)\\.(\\d+)', line.strip()))]; print('.'.join(map(str, max(versions))) if versions else '0.0.0')")
 
-            output = subprocess.check_output(['git', 'tag', '--list', 'v*'], text=True)
-            versions = []
-            for raw in output.splitlines():
-                match = re.fullmatch(r'v(\d+)\.(\d+)\.(\d+)', raw.strip())
-                if match:
-                    versions.append(tuple(int(x) for x in match.groups()))
-
-            if versions:
-                major, minor, patch = max(versions)
-                print(f'{major}.{minor}.{patch}')
-            else:
-                print('0.0.0')
-            PY
-            )
-
-            next_version=$(CURRENT_VERSION="$current_release" RELEASE_LABEL="$release_label" python3 - <<'PY'
-            import os
-
-            major, minor, patch = [int(x) for x in os.environ['CURRENT_VERSION'].split('.')]
-            label = os.environ['RELEASE_LABEL']
-
-            if label == 'version-major':
-                major, minor, patch = major + 1, 0, 0
-            elif label == 'version-minor':
-                major, minor, patch = major, minor + 1, 0
-            elif label == 'version-hot':
-                major, minor, patch = major, minor, patch + 1
-            else:
-                raise SystemExit(f'Unsupported release label: {label}')
-
-            print(f'{major}.{minor}.{patch}')
-            PY
-            )
+            next_version=$(CURRENT_VERSION="$current_release" RELEASE_LABEL="$release_label" python3 -c "import os; major, minor, patch = [int(x) for x in os.environ['CURRENT_VERSION'].split('.')]; label = os.environ['RELEASE_LABEL']; mapping = {'version-major': (major + 1, 0, 0), 'version-minor': (major, minor + 1, 0), 'version-hot': (major, minor, patch + 1)}; print('.'.join(map(str, mapping[label]))) if label in mapping else (_ for _ in ()).throw(SystemExit(f'Unsupported release label: {label}'))")
 
             echo "mode=release" >> "$GITHUB_OUTPUT"
             echo "chart_version=$next_version" >> "$GITHUB_OUTPUT"
@@ -215,19 +170,7 @@ jobs:
 
       - name: Update chart version
         run: |
-          APP_VERSION='${{ steps.context.outputs.chart_app_version }}' python3 - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          app_version = os.environ['APP_VERSION']
-
-          values_path = Path('gitops/charts/sample-app/values-dev.yaml')
-          values = values_path.read_text(encoding='utf-8')
-          values = re.sub(r'(^image:\n(?:  .*\n)*?  tag:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE)
-          values = re.sub(r'(^migration:\n(?:  .*\n)*?  releaseId:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE)
-          values_path.write_text(values, encoding='utf-8')
-          PY
+          APP_VERSION='${{ steps.context.outputs.chart_app_version }}' python3 -c "import os, re, pathlib; app_version = os.environ['APP_VERSION']; values_path = pathlib.Path('gitops/charts/sample-app/values-dev.yaml'); values = values_path.read_text(encoding='utf-8'); values = re.sub(r'(^image:\n(?:  .*\n)*?  tag:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE); values = re.sub(r'(^migration:\n(?:  .*\n)*?  releaseId:\s*).+$', rf'\g<1>{app_version}', values, flags=re.MULTILINE); values_path.write_text(values, encoding='utf-8')"
 
       - name: Commit chart version update
         run: |
