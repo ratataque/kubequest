@@ -3,7 +3,7 @@ name: metrics-dashboard-image
 on:
   pull_request:
     types:
-      - merged
+      - closed
     branches:
       - dev
     paths:
