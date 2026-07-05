@@ -39,4 +39,4 @@ Pour lancer le seed manuellement dans Kubernetes:
 kubectl exec -n sample-app-prod deploy/sample-app -- php artisan db:seed --force
 ```
 
-test=6
+test=7
