@@ -8,6 +8,5 @@ ingress:
   enabled: false
 
 config:
-  inCluster: true
   baseURL: /headlamp
   unsafeUseServiceAccountToken: true
