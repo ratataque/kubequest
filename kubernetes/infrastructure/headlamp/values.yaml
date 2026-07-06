@@ -1,12 +1,13 @@
 replicaCount: 1
 
 service:
-    type: ClusterIP
-    port: 80
+  type: ClusterIP
+  port: 80
 
 ingress:
-    enabled: false
+  enabled: false
 
 config:
-    inCluster: true
-    baseURL: /headlamp
+  inCluster: true
+  baseURL: /headlamp
+  unsafeUseServiceAccountToken: true
