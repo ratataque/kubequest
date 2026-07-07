@@ -22,6 +22,6 @@ spec:
       #       name: strip-first-segment
       #       namespace: traefik
       backendRefs:
-        - name: kube-prometheus-kube-prometheus-prometheus
+        - name: prometheus-operated
           port: 9090
           namespace: metrics
