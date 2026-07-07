@@ -14,13 +14,18 @@ spec:
         - path:
             type: PathPrefix
             value: /prometheus
-      # filters:
-      #   - type: ExtensionRef
-      #     extensionRef:
-      #       group: traefik.io
-      #       kind: Middleware
-      #       name: strip-first-segment
-      #       namespace: traefik
+      filters:
+        #   - type: ExtensionRef
+        #     extensionRef:
+        #       group: traefik.io
+        #       kind: Middleware
+        #       name: strip-first-segment
+        #       namespace: traefik
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: metrics-basic-auth
       backendRefs:
         - name: prometheus-operated
           port: 9090
