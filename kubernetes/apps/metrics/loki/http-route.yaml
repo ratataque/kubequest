@@ -20,13 +20,11 @@ spec:
             group: traefik.io
             kind: Middleware
             name: strip-first-segment
-            namespace: traefik
         - type: ExtensionRef
           extensionRef:
             group: traefik.io
             kind: Middleware
             name: metrics-basic-auth
-            namespace: traefik
       backendRefs:
         - name: loki
           port: 3100
