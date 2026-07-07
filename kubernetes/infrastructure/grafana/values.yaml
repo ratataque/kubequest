@@ -9,10 +9,10 @@ ingress:
 
 grafana.ini:
   server:
-    root_url: "%(protocol)s://%(domain)s/grafana"
+    root_url: "https://metrics.kwer.fr/grafana"
     serve_from_sub_path: true
-
-admin:
-  existingSecret: grafana-admin
-  userKey: admin-user
-  passwordKey: admin-password
+  auth.anonymous:
+    enabled: true
+    org_role: admin
+  auth:
+    disable_login_form: true
