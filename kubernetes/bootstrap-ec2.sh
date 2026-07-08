@@ -7,6 +7,8 @@ REPO_URL="${REPO_URL:-https://github.com/ratataque/kubequest.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/kubequest}"
 K8S_REPO_DIR="${K8S_REPO_DIR:-${INSTALL_DIR}/kubernetes}"
+GITOPS_REPO_DIR="${GITOPS_REPO_DIR:-${INSTALL_DIR}/gitops}"
+BOOTSTRAP_GITOPS="${BOOTSTRAP_GITOPS:-true}"    # apply gitops/argocd/*.yaml Applications, control-plane only
 
 K8S_SERIES="${K8S_SERIES:-v1.36}"
 K8S_VERSION="${K8S_VERSION:-v1.36.1}"
@@ -167,6 +169,9 @@ if [[ "${ROLE}" == "control-plane" ]]; then
     kubectl -n longhorn-system wait --for=condition=Ready pod --all --timeout=600s
     kubectl get sc longhorn >/dev/null
 
+    log "Applying additional Longhorn storage classes"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/storage/longhorn-2-replicas.yaml"
+
     log "Installing Argo CD"
     helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
     helm repo update
@@ -189,23 +194,80 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       -l app.kubernetes.io/name=sealed-secrets \
       --timeout=300s
 
-    log "Applying infra and app manifests"
+    log "Creating application namespaces"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/metrics-namespace.yaml"
+    kubectl create namespace registry --dry-run=client -o yaml | kubectl apply -f -
+
+    log "Installing Grafana"
+    helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
+    helm repo update
+    helm upgrade --install grafana grafana/grafana \
+      --namespace metrics \
+      --create-namespace \
+      -f "${K8S_REPO_DIR}/infrastructure/grafana/values.yaml"
+    kubectl -n metrics rollout status deploy/grafana --timeout=180s
+
+    log "Installing kube-prometheus-stack"
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+    helm repo update
+    helm upgrade --install kube-prometheus prometheus-community/kube-prometheus-stack \
+      --namespace metrics \
+      --create-namespace \
+      -f "${K8S_REPO_DIR}/infrastructure/kube-prometheus/values.yaml"
+
+    log "Installing Loki"
+    helm upgrade --install loki grafana/loki \
+      --namespace metrics \
+      --create-namespace \
+      -f "${K8S_REPO_DIR}/infrastructure/loki/values.yaml"
+
+    log "Installing Alloy (log shipper -> Loki)"
+    helm upgrade --install alloy grafana/alloy \
+      --namespace metrics \
+      --create-namespace \
+      -f "${K8S_REPO_DIR}/infrastructure/alloy/values.yaml"
+
+    log "Installing Headlamp"
+    helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/ >/dev/null 2>&1 || true
+    helm repo update
+    helm upgrade --install headlamp headlamp/headlamp \
+      --namespace kube-system \
+      -f "${K8S_REPO_DIR}/infrastructure/headlamp/values.yaml"
+    kubectl -n kube-system rollout status deploy/headlamp --timeout=180s
+
+    log "Applying gateway, reference grants and Traefik middlewares"
     kubectl apply -f "${K8S_REPO_DIR}/infrastructure/gateway.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/infrastructure/argocd/reference-grant.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/longhorn/reference-grant.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/grafana/reference-grant.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/kube-prometheus/reference-grant.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/loki/reference-grant.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/headlamp/reference-grant.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/secrets/traefik/metrics-auth.sealed-secret.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/middlewares/traefik/metrics-basic-auth.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/middlewares/traefik/strip-first-segment.yaml"
+
+    log "Applying app manifests"
     kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/argocd/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/grafana/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/headlamp/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/kube-prometheus/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/loki/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/longhorn/http-route.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/traefik/dashbaord-routes-ingress.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/traefik/metrics-route.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/whoami/deployement.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/whoami/http-route.yaml"
-    kubectl apply -f "${K8S_REPO_DIR}/apps/registry/registry-auth.secret.yaml"
+    kubectl apply -f "${K8S_REPO_DIR}/infrastructure/secrets/registry/registry-auth.secret.sealed-secret.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/registry/deployment.yaml"
     kubectl apply -f "${K8S_REPO_DIR}/apps/registry/http-route.yaml"
 
-    if [[ -f "${K8S_REPO_DIR}/apps/traefik-dashboard/auth" ]]; then
-      kubectl -n traefik create secret generic traefik-dashboard-auth \
-        --from-file=users="${K8S_REPO_DIR}/apps/traefik-dashboard/auth" \
-        --dry-run=client -o yaml | kubectl apply -f -
-      kubectl apply -f "${K8S_REPO_DIR}/apps/traefik-dashboard/dashboard-middlewares.yaml"
-      kubectl apply -f "${K8S_REPO_DIR}/apps/traefik-dashboard/dashbaord-routes-ingress.yaml"
-      kubectl apply -f "${K8S_REPO_DIR}/apps/traefik-dashboard/metrics-routes.yaml"
+    log "Bootstrapping Argo CD applications (GitOps root)"
+    if [[ "${BOOTSTRAP_GITOPS}" == "true" ]]; then
+      kubectl apply -f "${GITOPS_REPO_DIR}/argocd/pull-secrets.yaml"
+      kubectl apply -f "${GITOPS_REPO_DIR}/argocd/sample-app-dev.yaml"
+      kubectl apply -f "${GITOPS_REPO_DIR}/argocd/sample-app-prod.yaml"
+      kubectl apply -f "${GITOPS_REPO_DIR}/argocd/metrics-dashboard.yaml"
     fi
 
     if [[ "${INSTALL_NGINX}" == "true" ]]; then
@@ -218,16 +280,19 @@ if [[ "${ROLE}" == "control-plane" ]]; then
         exit 1
       fi
 
-      mkdir -p "${NGINX_TARGET_DIR}/sites-enabled" "${NGINX_TARGET_DIR}/snippets" "${NGINX_TARGET_DIR}/upstreams"
+      # Mirror every subdirectory that exists in the repo tree (sites-enabled, snippets, upstreams, ...)
+      # and re-link every *.conf file found, instead of hardcoding filenames one by one.
+      while IFS= read -r -d '' repo_subdir; do
+        mkdir -p "${NGINX_TARGET_DIR}/${repo_subdir}"
+        find "${NGINX_TARGET_DIR}/${repo_subdir}" -maxdepth 1 -type l -delete
+      done < <(find "${NGINX_SOURCE_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\0')
       find "${NGINX_TARGET_DIR}" -maxdepth 1 -type l -delete
-      find "${NGINX_TARGET_DIR}/sites-enabled" -maxdepth 1 -type l -delete
-      find "${NGINX_TARGET_DIR}/snippets" -maxdepth 1 -type l -delete
-      find "${NGINX_TARGET_DIR}/upstreams" -maxdepth 1 -type l -delete
-      ln -sfn "${NGINX_SOURCE_DIR}/default.conf" "${NGINX_TARGET_DIR}/default.conf"
-      ln -sfn "${NGINX_SOURCE_DIR}/sites-enabled/registry.kwer.fr.conf" "${NGINX_TARGET_DIR}/sites-enabled/registry.kwer.fr.conf"
-      ln -sfn "${NGINX_SOURCE_DIR}/sites-enabled/whoami.kwer.fr.conf" "${NGINX_TARGET_DIR}/sites-enabled/whoami.kwer.fr.conf"
-      ln -sfn "${NGINX_SOURCE_DIR}/snippets/proxy-traefik.conf" "${NGINX_TARGET_DIR}/snippets/proxy-traefik.conf"
-      ln -sfn "${NGINX_SOURCE_DIR}/upstreams/traefik.conf" "${NGINX_TARGET_DIR}/upstreams/traefik.conf"
+
+      while IFS= read -r -d '' conf_file; do
+        rel_path="${conf_file#"${NGINX_SOURCE_DIR}"/}"
+        ln -sfn "${conf_file}" "${NGINX_TARGET_DIR}/${rel_path}"
+      done < <(find "${NGINX_SOURCE_DIR}" -maxdepth 2 -type f -name '*.conf' -print0)
+
       nginx -t
       systemctl enable --now nginx
       systemctl restart nginx
