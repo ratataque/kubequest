@@ -1,0 +1,21 @@
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+
+persistence:
+  enabled: true
+  type: pvc
+  storageClassName: longhorn-2-replicas
+  accessModes:
+    - ReadWriteOnce
+  size: 2Gi
+
+ingress:
+  enabled: false
+
+grafana.ini:
+  server:
+    root_url: "https://metrics.kwer.fr/grafana/"
+    serve_from_sub_path: true

@@ -1,0 +1,21 @@
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+prometheus:
+  service:
+    type: ClusterIP
+  prometheusSpec:
+    externalUrl: https://metrics.kwer.fr/prometheus
+    routePrefix: /prometheus
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn-2-replicas
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi

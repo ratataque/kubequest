@@ -1,0 +1,67 @@
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  structuredConfig:
+    server:
+      http_listen_port: 3100
+    common:
+      replication_factor: 1
+      path_prefix: /var/loki
+      ring:
+        kvstore:
+          store: inmemory
+    schema_config:
+      configs:
+        - from: "2024-04-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+    storage_config:
+      filesystem:
+        directory: /var/loki/chunks
+  storage:
+    type: filesystem
+    bucketNames:
+      chunks: chunks
+      ruler: ruler
+      admin: admin
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    storageClass: longhorn-2-replicas
+    accessModes:
+      - ReadWriteOnce
+    size: 2Gi
+
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+gateway:
+  enabled: false
+
+test:
+  enabled: false
+
+chunksCache:
+  enabled: true
+  allocatedMemory: 256
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 384Mi
+
+monitoring:
+  selfMonitoring:
+    enabled: false
