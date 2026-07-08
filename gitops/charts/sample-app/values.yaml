@@ -1,73 +1,73 @@
 replicaCount: 1
 
 image:
-  repository: registry.kwer.fr/kubequest/prod/sample-app-master
-  tag: latest
-  pullPolicy: IfNotPresent
+    repository: registry.kwer.fr/kubequest/prod/sample-app-master
+    tag: latest
+    pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 
 service:
-  type: ClusterIP
-  port: 80
+    type: ClusterIP
+    port: 80
 
 mysql:
-  enabled: true
-  image:
-    repository: mysql
-    tag: "8.0"
-    pullPolicy: IfNotPresent
-  service:
-    port: 3306
-  persistence:
     enabled: true
-    size: 4Gi
-    storageClassName: ""
-  auth:
-    rootPasswordKey: DB_PASSWORD
+    image:
+        repository: mysql
+        tag: "8.0"
+        pullPolicy: IfNotPresent
+    service:
+        port: 3306
+    persistence:
+        enabled: true
+        size: 4Gi
+        storageClassName: ""
+    auth:
+        rootPasswordKey: DB_PASSWORD
 
 ingress:
-  enabled: false
-  className: nginx
-  annotations: {}
-  hosts: []
+    enabled: false
+    className: nginx
+    annotations: {}
+    hosts: []
 
 httpRoute:
-  enabled: false
-  hostname: ""
-  gateway:
-    name: cluster-edge-gateway
-    namespace: traefik
+    enabled: false
+    hostname: ""
+    gateway:
+        name: cluster-edge-gateway
+        namespace: traefik
 
 resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: 500m
-    memory: 512Mi
+    requests:
+        cpu: 100m
+        memory: 128Mi
+    limits:
+        cpu: 500m
+        memory: 512Mi
 
 autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 3
-  targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 80
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
 
 secret:
-  create: true
-  existingSecret: ""
-  data:
-    APP_ENV: production
-    APP_DEBUG: "false"
-    APP_KEY: ""
-    DB_CONNECTION: mysql
-    DB_HOST: ""
-    DB_PORT: "3306"
-    DB_DATABASE: ""
-    DB_USERNAME: ""
-    DB_PASSWORD: ""
+    create: true
+    existingSecret: ""
+    data:
+        APP_ENV: production
+        APP_DEBUG: "false"
+        APP_KEY: ""
+        DB_CONNECTION: mysql
+        DB_HOST: ""
+        DB_PORT: "3306"
+        DB_DATABASE: ""
+        DB_USERNAME: ""
+        DB_PASSWORD: ""
 
 migration:
-  enabled: true
-  releaseId: default
+    enabled: true
+    releaseId: default
