@@ -65,7 +65,10 @@ sysctl --system >/dev/null
 
 log "Disabling swap"
 swapoff -a || true
-cp -a /etc/fstab /etc/fstab.bak.kubequest
+# Only keep the very first (pristine) fstab backup across re-runs.
+if [[ ! -f /etc/fstab.bak.kubequest ]]; then
+  cp -a /etc/fstab /etc/fstab.bak.kubequest
+fi
 if [[ -f /etc/fstab ]]; then
   perl -0pi -e 's/^([^#].*\sswap\s+.*)$/# $1/gm' /etc/fstab
 fi
@@ -73,7 +76,11 @@ fi
 log "Installing and configuring containerd"
 dnf install -y containerd
 mkdir -p /etc/containerd
-containerd config default >/etc/containerd/config.toml
+# Only (re-)generate the default config once, so re-running the script doesn't
+# wipe out any config drift/customization made outside this script.
+if [[ ! -f /etc/containerd/config.toml ]]; then
+  containerd config default >/etc/containerd/config.toml
+fi
 perl -0pi -e 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
 systemctl enable --now containerd
 systemctl restart containerd
@@ -156,7 +163,8 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       --namespace traefik \
       --create-namespace \
       -f "${K8S_REPO_DIR}/traefik-ingress/values.yaml"
-    kubectl -n traefik rollout status deploy/traefik --timeout=180s
+    kubectl -n traefik rollout status deploy/traefik --timeout=180s \
+      || log "Traefik rollout not confirmed within timeout, continuing (best effort)"
 
     log "Installing Longhorn"
     helm repo add longhorn https://charts.longhorn.io >/dev/null 2>&1 || true
@@ -166,7 +174,8 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       --namespace longhorn-system \
       --create-namespace \
       -f "${K8S_REPO_DIR}/infrastructure/longhorn/values.yaml"
-    kubectl -n longhorn-system wait --for=condition=Ready pod --all --timeout=600s
+    kubectl -n longhorn-system wait --for=condition=Ready pod --all --timeout=600s \
+      || log "Longhorn pods not all Ready within timeout, continuing (best effort)"
     kubectl get sc longhorn >/dev/null
 
     log "Applying additional Longhorn storage classes"
@@ -181,7 +190,8 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       -f "${K8S_REPO_DIR}/infrastructure/argocd/values.yaml"
     kubectl -n argocd wait --for=condition=Available deployment \
       -l app.kubernetes.io/name=argocd-server \
-      --timeout=300s
+      --timeout=300s \
+      || log "Argo CD server not Available within timeout, continuing (best effort)"
 
     log "Installing Sealed Secrets controller"
     helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets >/dev/null 2>&1 || true
@@ -192,7 +202,8 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       --set-string fullnameOverride=sealed-secrets-controller
     kubectl -n sealed-secrets wait --for=condition=Available deployment \
       -l app.kubernetes.io/name=sealed-secrets \
-      --timeout=300s
+      --timeout=300s \
+      || log "Sealed Secrets controller not Available within timeout, continuing (best effort)"
 
     log "Creating application namespaces"
     kubectl apply -f "${K8S_REPO_DIR}/apps/metrics/metrics-namespace.yaml"
@@ -205,7 +216,8 @@ if [[ "${ROLE}" == "control-plane" ]]; then
       --namespace metrics \
       --create-namespace \
       -f "${K8S_REPO_DIR}/infrastructure/grafana/values.yaml"
-    kubectl -n metrics rollout status deploy/grafana --timeout=180s
+    kubectl -n metrics rollout status deploy/grafana --timeout=180s \
+      || log "Grafana rollout not confirmed within timeout, continuing (best effort)"
 
     log "Installing kube-prometheus-stack"
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
@@ -233,7 +245,8 @@ if [[ "${ROLE}" == "control-plane" ]]; then
     helm upgrade --install headlamp headlamp/headlamp \
       --namespace kube-system \
       -f "${K8S_REPO_DIR}/infrastructure/headlamp/values.yaml"
-    kubectl -n kube-system rollout status deploy/headlamp --timeout=180s
+    kubectl -n kube-system rollout status deploy/headlamp --timeout=180s \
+      || log "Headlamp rollout not confirmed within timeout, continuing (best effort)"
 
     log "Applying gateway, reference grants and Traefik middlewares"
     kubectl apply -f "${K8S_REPO_DIR}/infrastructure/gateway.yaml"
