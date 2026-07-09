@@ -1,6 +1,6 @@
 image:
   repository: registry.kwer.fr/kubequest/dev/sample-app-master
-  tag: 0.4.1
+  tag: 0.4.2
 
 imagePullSecrets:
   - name: registry-pull-secret
@@ -17,4 +17,4 @@ secret:
   existingSecret: sample-app-env
 
 migration:
-  releaseId: 0.4.1
+  releaseId: 0.4.2
